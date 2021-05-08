@@ -16,6 +16,7 @@ const { nextTick } = require("process");
 
 const multer  = require('multer');
 const Review = require("../model/Review");
+
 // const multerS3 = require('multer-s3');
 // const AWS = require('aws-sdk');
 
@@ -23,37 +24,16 @@ const Review = require("../model/Review");
 //     accessKeyId: process.env.S3_ACCESS_KEY,
 //     secretAccessKey: process.env.S3_ACCESS_SECRET
 // });
-
-// const uploadS3 = multer({
-//   storage: multerS3 ({
-//     s3: s3,
-//     acl: 'public-read',
-//     bucket: 'izunna',
-//     metadata: (req, file, cb) => {
-//       cb(null, {fieldName: file.fieldname})
-//     },
-//     key: (req, file, cb) => {
-//       cb(null, Date.now().toString() + '-' + req.user._id + '-' + file.originalname)
-//     }
-//   })
-// });
-
-router.get('/dashboard',auth, (req,res) =>{
-
-    User.findById(req.user._id, function(err, user) {
-        if(user){
-            res.json({
-                user:user
-            })
-        }
-        else{
-            res.status(400).json({error:"User not Found"})
-        }
-     });
-        
-    
- })
-
+var storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, 'uploads')
+    },
+    filename: function (req, file, cb) {
+      cb(null,file.originalname)
+    }
+  })
+   
+  var upload = multer({ storage: storage })
 
 router.post('/register', async (req,res) =>{
     console.log(req.body)
@@ -123,7 +103,7 @@ router.post('/login', async (req,res) =>{
 
 router.get('/', async (req,res) =>{
     if(req.query.sort == 'Top'){
-        const reviews = await Review.find().populate('apartment').sort({count: -1})
+        const reviews = await Review.find().populate('apartment').sort({helpful: -1})
     if(reviews){
         res.status(200).json(
             reviews    
@@ -134,7 +114,7 @@ router.get('/', async (req,res) =>{
     }
     }
     else{
-   const reviews = await Review.find().populate('apartment')
+   const reviews = await Review.find().populate('apartment').sort({createdAt: -1})
     if(reviews){
         res.status(200).json(
             reviews    
@@ -188,40 +168,71 @@ router.post('/new-apartment',auth, async (req,res) =>{
             res.status(400).json(err);
         }
     })  
-router.post('/:id/review',auth, async (req,res) =>{
-    console.log(req.body)
-    console.log(req.params.id)
-    await Apartment.findById(req.params.id, async function(err, apartment) {
-        console.log(apartment)
-        if(apartment){
-            const {error} = reviewValidation(req.body);
-        if(error){
-                return res.status(400).json({error:error.details[0].message})
-            }
-            //create the review
-            const review = new Review ({
-                description : req.body.description,
-                apartment: req.params.id
-                })
-            try {
-               await review.save();
-               apartment.reviews.push(review)
-               await apartment.save()
-               res.status(200).json({success: "successfully posted a review" });
-            }catch(err){
-                res.status(400).json(err);
-            }
-
-        }
-        else{
-            res.status(400).json({error:"apartment not Found"})
-        }
-     });
+router.post('/:id/review',auth, upload.single('myfile'), async (req,res) =>{
+    const file = req.file
+    console.log(file)
+    if (!file){
+        console.log("without file")
+        await Apartment.findById(req.params.id, async function(err, apartment) {
+            console.log(apartment)
+            if(apartment){
+                const {error} = reviewValidation(req.body);
+            if(error){
+                    return res.status(400).json({error:error.details[0].message})
+                }
+                //create the review
+                const review = new Review ({
+                    description : req.body.description,
+                    apartment: req.params.id
+                    })
+                try {
+                   await review.save();
+                   apartment.reviews.push(review)
+                   await apartment.save()
+                   res.status(200).json({success: "successfully posted a review" });
+                }catch(err){
+                    res.status(400).json(err);
+                }
     
+            }
+            else{
+                res.status(400).json({error:"apartment not Found"})
+            }
+         });
+    }else{
+        console.log('with file')
+        await Apartment.findById(req.params.id, async function(err, apartment) {
+            console.log(apartment)
+            if(apartment){
+                const {error} = reviewValidation(req.body);
+            if(error){
+                    return res.status(400).json({error:error.details[0].message})
+                }
+                //create the review
+                const review = new Review ({
+                    description : req.body.description,
+                    apartment: req.params.id,
+                    file: file.path
+                    })
+                try {
+                   await review.save();
+                   apartment.reviews.push(review)
+                   await apartment.save()
+                   res.status(200).json({success: "successfully posted a review" });
+                }catch(err){
+                    res.status(400).json(err);
+                }
+    
+            }
+            else{
+                res.status(400).json({error:"apartment not Found"})
+            }
+         });
+    }
         })  
 router.post('/:id/mark', async(req,res) => {
     try{
-        await Review.findByIdAndUpdate(req.params.id, {$inc:{count: 1}})
+        await Review.findOneAndUpdate({_id: req.params.id}, {$inc:{helpful: 1}})
         res.status(200).json({"success":"marked as helpful"})
     }
     catch(err){

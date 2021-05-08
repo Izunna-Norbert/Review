@@ -16,7 +16,8 @@ require('dotenv').config();
 //connect to db
 mongoose.connect(process.env.DB_CONNECT,
     {useNewUrlParser: true,
-    useUnifiedTopology: true},
+    useUnifiedTopology: true,
+useFindAndModify: false},
     () => console.log('connected to db!')
 );
 
@@ -32,7 +33,7 @@ app.use(bodyParser.urlencoded({extended: true}));
 //Routes middlewares
 app.use('/api', theRoute);
 
-app.use(upload.array());
+// app.use(upload.array());
 
 const PORT = process.env.PORT || 3000;
 

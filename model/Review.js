@@ -5,7 +5,7 @@ const reviewSchema = new mongoose.Schema({
     description:{
         type:String
     },
-    count:{
+    helpful:{
         type: Number,
         default: 0
     },
@@ -15,6 +15,9 @@ const reviewSchema = new mongoose.Schema({
     createdAt:{
         type: Date,
         default: Date.now()
+    },
+    file:{
+        type: String
     }
 })
 
